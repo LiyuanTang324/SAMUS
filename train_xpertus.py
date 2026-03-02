@@ -131,7 +131,7 @@ def main():
         TensorWriter = SummaryWriter(boardpath)
 
     # ---- reproducibility ----
-    seed_value = 1234
+    seed_value = getattr(opt, 'seed', 42)
     np.random.seed(seed_value)
     random.seed(seed_value)
     os.environ['PYTHONHASHSEED'] = str(seed_value)

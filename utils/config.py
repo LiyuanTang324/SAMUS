@@ -138,6 +138,7 @@ class Config_XpertUS:
     tensorboard_path = "./tensorboard/XpertUS/"
     load_path = save_path + "/best_model.pth"
     save_path_code = "_"
+    seed = 42
 
     workers = 1
     epochs = 200
