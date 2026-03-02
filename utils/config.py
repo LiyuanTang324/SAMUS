@@ -130,6 +130,38 @@ class Config_CAMUS:
     visual = False
     modelname = "SAM"
 
+# -------------------------------------------------------------------------------------------------
+class Config_XpertUS:
+    data_path = "../../data"
+    save_path = "./checkpoints/XpertUS/"
+    result_path = "./result/XpertUS/"
+    tensorboard_path = "./tensorboard/XpertUS/"
+    load_path = save_path + "/best_model.pth"
+    save_path_code = "_"
+
+    workers = 1
+    epochs = 200
+    batch_size = 32
+    learning_rate = 1e-4
+    momentum = 0.9
+    classes = 2
+    img_size = 256
+    train_split = "train"
+    val_split = "val"
+    test_split = "test"
+    crop = None
+    eval_freq = 1
+    save_freq = 2000
+    device = "cuda"
+    cuda = "on"
+    gray = "yes"
+    img_channel = 1
+    eval_mode = "mask_slice"
+    pre_trained = False
+    mode = "train"
+    visual = False
+    modelname = "SAM"
+
 # ==================================================================================================
 def get_config(task="US30K"):
     if task == "US30K":
@@ -140,5 +172,7 @@ def get_config(task="US30K"):
         return Config_BUSI()
     elif task == "CAMUS":
         return Config_CAMUS()
+    elif task == "XpertUS":
+        return Config_XpertUS()
     else:
         assert("We do not have the related dataset, please choose another task.")
