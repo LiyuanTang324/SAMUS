@@ -27,7 +27,6 @@ from utils.loss_functions.sam_loss import get_criterion
 from utils.generate_prompts import get_click_prompt
 from models.model_dict import get_model
 import utils.metrics as metrics
-from hausdorff import hausdorff_distance
 
 
 def inference(args, model, opt, tf_val):
@@ -71,9 +70,6 @@ def inference(args, model, opt, tf_val):
         dices = np.zeros(max_samples)
         hds = np.zeros(max_samples)
         ious = np.zeros(max_samples)
-        accs = np.zeros(max_samples)
-        ses = np.zeros(max_samples)
-        sps = np.zeros(max_samples)
         eval_number = 0
 
         for datapack in testloader:
@@ -103,21 +99,13 @@ def inference(args, model, opt, tf_val):
                 gt_i[gt[j:j+1] == 1] = 255
 
                 dices[eval_number] = metrics.dice_coefficient(pred_i, gt_i)
-                iou, acc, se, sp = metrics.sespiou_coefficient2(pred_i, gt_i, all=False)
-                ious[eval_number] = iou
-                accs[eval_number] = acc
-                ses[eval_number] = se
-                sps[eval_number] = sp
-                hds[eval_number] = hausdorff_distance(
-                    pred_i[0], gt_i[0], distance="manhattan")
+                ious[eval_number] = metrics.iou_coefficient(pred_i, gt_i)
+                hds[eval_number] = metrics.hausdorff_95(pred_i[0], gt_i[0])
                 eval_number += 1
 
         dices = dices[:eval_number]
         hds = hds[:eval_number]
         ious = ious[:eval_number]
-        accs = accs[:eval_number]
-        ses = ses[:eval_number]
-        sps = sps[:eval_number]
 
         mean_dice = np.mean(dices) * 100
         std_dice = np.std(dices) * 100
@@ -125,20 +113,11 @@ def inference(args, model, opt, tf_val):
         std_hd = np.std(hds)
         mean_iou = np.mean(ious) * 100
         std_iou = np.std(ious) * 100
-        mean_acc = np.mean(accs) * 100
-        std_acc = np.std(accs) * 100
-        mean_se = np.mean(ses) * 100
-        std_se = np.std(ses) * 100
-        mean_sp = np.mean(sps) * 100
-        std_sp = np.std(sps) * 100
 
         logging.info('--- {} ---'.format(ds_name))
-        logging.info('  Dice: {:.2f} +/- {:.2f}'.format(mean_dice, std_dice))
-        logging.info('  HD:   {:.2f} +/- {:.2f}'.format(mean_hd, std_hd))
+        logging.info('  DSC:  {:.2f} +/- {:.2f}'.format(mean_dice, std_dice))
+        logging.info('  HD95: {:.2f} +/- {:.2f}'.format(mean_hd, std_hd))
         logging.info('  IoU:  {:.2f} +/- {:.2f}'.format(mean_iou, std_iou))
-        logging.info('  Acc:  {:.2f} +/- {:.2f}'.format(mean_acc, std_acc))
-        logging.info('  SE:   {:.2f} +/- {:.2f}'.format(mean_se, std_se))
-        logging.info('  SP:   {:.2f} +/- {:.2f}'.format(mean_sp, std_sp))
 
         all_results[ds_name] = mean_dice / 100.0
 

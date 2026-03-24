@@ -29,7 +29,6 @@ from utils.loss_functions.sam_loss import get_criterion
 from utils.generate_prompts import get_click_prompt
 from models.model_dict import get_model
 import utils.metrics as metrics
-from hausdorff import hausdorff_distance
 
 
 def validate_per_dataset(model, criterion, opt, args, tf_val):
