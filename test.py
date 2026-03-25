@@ -110,6 +110,21 @@ def main():
 
     model.eval()
 
+    with torch.no_grad():
+        for _ in range(10):
+            _ = model(input, points)
+        torch.cuda.synchronize()
+        t_start = time.time()
+        fps_iters = 100
+        for _ in range(fps_iters):
+            _ = model(input, points)
+        torch.cuda.synchronize()
+        t_end = time.time()
+    fps = fps_iters / (t_end - t_start)
+    print('FPS: {:.2f}'.format(fps))
+
+    torch.cuda.reset_peak_memory_stats()
+
     if opt.mode == "train":
         dices, mean_dice, _, val_losses = get_eval(valloader, model, criterion=criterion, opt=opt, args=args)
         print("mean dice:", mean_dice)
@@ -120,6 +135,9 @@ def main():
         print("DSC:  ", mean_dice[1:], "±", std_dice[1:])
         print("HD95: ", mean_hdis[1:], "±", std_hdis[1:])
         print("IoU:  ", mean_iou[1:], "±", std_iou[1:])
+
+    vram_peak_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+    print('VRAM Peak: {:.2f} MB'.format(vram_peak_mb))
     
 if __name__ == '__main__':
     main()

@@ -27,6 +27,7 @@ from utils.loss_functions.sam_loss import get_criterion
 from utils.generate_prompts import get_click_prompt
 from models.model_dict import get_model
 import utils.metrics as metrics
+from thop import profile
 
 
 def inference(args, model, opt, tf_val):
@@ -51,6 +52,7 @@ def inference(args, model, opt, tf_val):
 
     model.eval()
     all_results = {}
+    torch.cuda.reset_peak_memory_stats()
 
     for ds_name in seg_datasets:
         test_dataset = XpertUSSingleDataset(
@@ -129,6 +131,9 @@ def inference(args, model, opt, tf_val):
                 time.strftime("%Y-%m-%d %H:%M:%S"),
             ])
 
+    vram_peak_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+    logging.info('VRAM Peak: {:.2f} MB'.format(vram_peak_mb))
+
     logging.info('========== Summary ==========')
     for ds_name, dice in all_results.items():
         logging.info('  {:15s}  Dice: {:.4f}'.format(ds_name, dice))
@@ -185,6 +190,25 @@ def main():
 
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Total_params: {}".format(pytorch_total_params))
+
+    dummy_input = torch.randn(1, 1, args.encoder_input_size, args.encoder_input_size).to(device)
+    dummy_points = (torch.tensor([[[1, 2]]]).float().to(device), torch.tensor([[1]]).float().to(device))
+    flops, params = profile(model, inputs=(dummy_input, dummy_points))
+    print('GFLOPs: {:.4f}  params: {:.0f}'.format(flops / 1e9, params))
+
+    model.eval()
+    with torch.no_grad():
+        for _ in range(10):
+            _ = model(dummy_input, dummy_points)
+        torch.cuda.synchronize()
+        t_start = time.time()
+        fps_iters = 100
+        for _ in range(fps_iters):
+            _ = model(dummy_input, dummy_points)
+        torch.cuda.synchronize()
+        t_end = time.time()
+    fps = fps_iters / (t_end - t_start)
+    print('FPS: {:.2f}'.format(fps))
 
     tf_val = JointTransform2D(
         img_size=args.encoder_input_size, low_img_size=args.low_image_size,
