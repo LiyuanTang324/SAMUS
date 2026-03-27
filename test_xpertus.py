@@ -31,11 +31,17 @@ from thop import profile
 
 
 def inference(args, model, opt, tf_val):
+    CSV_HEADER = [
+        "dataset", "task_type", "prompt",
+        "DSC", "IoU", "HD95",
+        "AUC", "Macro_F1", "Sens@Spec90", "Sens@Spec95",
+        "FPS", "time",
+    ]
     os.makedirs(opt.result_path, exist_ok=True)
     csv_path = os.path.join(opt.result_path, 'result.csv')
     if not os.path.exists(csv_path):
         with open(csv_path, 'w', newline='') as f:
-            csv.writer(f).writerow(['dataset', 'task', 'metric', 'time'])
+            csv.writer(f).writerow(CSV_HEADER)
 
     log_path = os.path.join(opt.result_path, 'test_result.txt')
     logging.basicConfig(
@@ -73,6 +79,8 @@ def inference(args, model, opt, tf_val):
         hds = np.zeros(max_samples)
         ious = np.zeros(max_samples)
         eval_number = 0
+        ds_total_time = 0.0
+        ds_total_samples = 0
 
         for datapack in testloader:
             imgs = datapack['image'].to(dtype=torch.float32, device=opt.device)
@@ -80,8 +88,13 @@ def inference(args, model, opt, tf_val):
             label = datapack['label'].to(dtype=torch.float32, device=opt.device)
             pt = get_click_prompt(datapack, opt)
 
+            torch.cuda.synchronize()
+            t_batch_start = time.time()
             with torch.no_grad():
                 pred = model(imgs, pt)
+            torch.cuda.synchronize()
+            ds_total_time += time.time() - t_batch_start
+            ds_total_samples += imgs.shape[0]
 
             if args.modelname in ('MSA', 'SAM'):
                 gt = masks.detach().cpu().numpy()
@@ -120,14 +133,20 @@ def inference(args, model, opt, tf_val):
         logging.info('  DSC:  {:.2f} +/- {:.2f}'.format(mean_dice, std_dice))
         logging.info('  HD95: {:.2f} +/- {:.2f}'.format(mean_hd, std_hd))
         logging.info('  IoU:  {:.2f} +/- {:.2f}'.format(mean_iou, std_iou))
+        if ds_total_time > 0:
+            ds_fps = ds_total_samples / ds_total_time
+            logging.info('  Inference FPS: {:.2f} ({} samples in {:.2f}s)'.format(
+                ds_fps, ds_total_samples, ds_total_time))
 
         all_results[ds_name] = mean_dice / 100.0
 
+        seg_fps_str = f"{ds_total_samples / ds_total_time:.2f}" if ds_total_time > 0 else ""
         with open(csv_path, 'a', newline='') as f:
             csv.writer(f).writerow([
-                ds_name,
-                'samus_seg@' + args.modelname,
-                mean_dice / 100.0,
+                ds_name, "segmentation", False,
+                f"{mean_dice / 100.0:.4f}", f"{mean_iou / 100.0:.4f}", f"{mean_hd:.4f}",
+                "", "", "", "",
+                seg_fps_str,
                 time.strftime("%Y-%m-%d %H:%M:%S"),
             ])
 
